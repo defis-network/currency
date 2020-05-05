@@ -241,9 +241,10 @@ void currency::handle_deposit(name from, name to, asset quantity, string memo)
    if (from == _self || to != _self)
       return;
 
-   if (memo != "mint")
+   if (from == name("eosio") || from == name("eosio.ram") || from == name("eosio.rex") || from == name("eosio.stake"))
       return;
 
+   check(memo == "mint", "invalid memo");
    check(quantity.amount >= 10000, "less than 1 EOS");
 
    globals glb = _globals.get();
