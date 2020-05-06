@@ -5,7 +5,7 @@ using namespace eosio;
 using namespace std;
 
 static constexpr symbol rex_symbol = symbol(symbol_code("REX"), 4);
-
+static constexpr symbol ramcore_symbol = symbol(symbol_code("RAMCORE"), 4);
 struct transfer_args
 {
     name from;
@@ -18,7 +18,6 @@ struct configs
 {
     name vote_proxy;
     name price_oracle;
-    name price_source;
     uint64_t price_period;
     uint64_t price_lower_bound;
     uint64_t price_upper_bound;
@@ -68,4 +67,27 @@ struct rex_balance
 };
 
 typedef eosio::multi_index<"rexbal"_n, rex_balance> rex_balance_table;
-rex_balance_table        _rexbalance(name("eosio"), name("eosio").value);
+rex_balance_table _rexbalance(name("eosio"), name("eosio").value);
+
+// system rammarket
+struct exstate
+{
+    asset supply;
+
+    struct connector
+    {
+        asset balance;
+        double weight = .5;
+
+        EOSLIB_SERIALIZE(connector, (balance)(weight))
+    };
+
+    connector base;
+    connector quote;
+
+    uint64_t primary_key() const { return supply.symbol.raw(); }
+
+    EOSLIB_SERIALIZE(exstate, (supply)(base)(quote))
+};
+
+typedef eosio::multi_index<"rammarket"_n, exstate> rammarket;

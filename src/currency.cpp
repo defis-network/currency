@@ -245,7 +245,8 @@ void currency::handle_deposit(name from, name to, asset quantity, string memo)
       return;
 
    check(memo == "mint", "invalid memo");
-   
+   auto sym = get_core_symbol();
+   check(sym == quantity.symbol, "only assecp core token.");
 
    globals glb = _globals.get();
 
