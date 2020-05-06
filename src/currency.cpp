@@ -275,7 +275,7 @@ void currency::handle_deposit(name from, name to, asset quantity, string memo)
    check(issue_quantity.amount > fee_quantity.amount, "Invalid fee amount");
    pay_quantity.amount = issue_quantity.amount - fee_quantity.amount;
 
-   print("debug1:", issue_quantity, " , pay_quantity:", pay_quantity, " ,fee_quantity:", fee_quantity);
+   print("debug1: issue_quantity: ", issue_quantity, " , pay_quantity:", pay_quantity, " ,fee_quantity:", fee_quantity);
 
    // save debt record
    _debts.emplace(_self, [&](auto &s) {
@@ -285,8 +285,6 @@ void currency::handle_deposit(name from, name to, asset quantity, string memo)
       s.issue = issue_quantity;
       s.create_time = current_time_point();
    });
-
-   print("debug:", issue_quantity);
 
    // issue and transfer JIN token
    SEND_INLINE_ACTION(*this, issue, {_self, name("active")}, {_self, issue_quantity, memo});
