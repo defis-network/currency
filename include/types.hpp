@@ -18,13 +18,13 @@ struct configs
 {
     name vote_proxy;
     name price_oracle;
+    name price_source;
     uint64_t price_period;
     uint64_t price_lower_bound;
     uint64_t price_upper_bound;
     uint64_t minimum_collateral_ratio;
+    uint64_t minimum_deposit;
     uint64_t mint_fee;
-
-    EOSLIB_SERIALIZE(configs, (vote_proxy)(price_oracle)(price_period)(price_lower_bound)(price_upper_bound)(minimum_collateral_ratio)(mint_fee))
 };
 
 typedef singleton<"configs"_n, configs> configs_index;

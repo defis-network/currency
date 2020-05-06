@@ -245,13 +245,15 @@ void currency::handle_deposit(name from, name to, asset quantity, string memo)
       return;
 
    check(memo == "mint", "invalid memo");
-   check(quantity.amount >= 10000, "less than 1 EOS");
+   
 
    globals glb = _globals.get();
 
    // get dao from global
    configs_index _configs(glb.dao, glb.dao.value);
    configs cfg = _configs.get();
+
+   check(quantity.amount >= cfg.minimum_deposit, "less than minimum_deposit");
 
    // get oracle from dao
    avgprices _avgprices(cfg.price_oracle, 0);
@@ -269,7 +271,10 @@ void currency::handle_deposit(name from, name to, asset quantity, string memo)
 
    issue_quantity.amount = quantity.amount * price * 100 / cfg.minimum_collateral_ratio / 10000ll;
    fee_quantity.amount = issue_quantity.amount / 1000 * cfg.mint_fee;
+   check(issue_quantity.amount > fee_quantity.amount, "Invalid fee amount");
    pay_quantity.amount = issue_quantity.amount - fee_quantity.amount;
+
+   print("debug1:", issue_quantity, " , pay_quantity:", pay_quantity, " ,fee_quantity:", fee_quantity);
 
    // save debt record
    _debts.emplace(_self, [&](auto &s) {
@@ -279,6 +284,8 @@ void currency::handle_deposit(name from, name to, asset quantity, string memo)
       s.issue = issue_quantity;
       s.create_time = current_time_point();
    });
+
+   print("debug:", issue_quantity);
 
    // issue and transfer JIN token
    SEND_INLINE_ACTION(*this, issue, {_self, name("active")}, {_self, issue_quantity, memo});
