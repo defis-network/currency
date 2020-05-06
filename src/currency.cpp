@@ -356,17 +356,17 @@ void currency::handle_redeem(name from, name to, asset quantity, string memo)
  */
 time_point_sec currency::get_rex_maturity()
 {
-   // const uint32_t seconds_per_day = 24 * 3600;
-   // const uint32_t num_of_maturity_buckets = 5;
-   // static const uint32_t now = current_time_point().sec_since_epoch();
-   // static const uint32_t r = now % seconds_per_day;
-   // static const time_point_sec rms{now - r + num_of_maturity_buckets * seconds_per_day};
-   // return rms;
-
+   const uint32_t seconds_per_day = 24 * 3600;
+   const uint32_t num_of_maturity_buckets = 5;
    static const uint32_t now = current_time_point().sec_since_epoch();
-   const uint32_t seconds_per_day = 60 * 5;
-   static const time_point_sec rms{now + seconds_per_day};
+   static const uint32_t r = now % seconds_per_day;
+   static const time_point_sec rms{now - r + num_of_maturity_buckets * seconds_per_day};
    return rms;
+   // for test
+   // static const uint32_t now = current_time_point().sec_since_epoch();
+   // const uint32_t seconds_per_day = 60 * 5;
+   // static const time_point_sec rms{now + seconds_per_day};
+   // return rms;
 }
 
 uint64_t currency::get_id()
