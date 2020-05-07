@@ -31,16 +31,12 @@ typedef singleton<"configs"_n, configs> configs_index;
 struct avgprice
 {
     uint64_t key;
-
     name submitter;
     string period;
-
     uint64_t price0_cumulative_last;
     uint64_t price1_cumulative_last;
-
     double price0_avg_price;
     double price1_avg_price;
-
     time_point_sec last_update;
 
     uint64_t primary_key() const { return key; }
@@ -48,12 +44,6 @@ struct avgprice
 
 typedef multi_index<"avgprices"_n, avgprice> avgprices;
 
-// `rex_balance` structure underlying the rex balance table. A rex balance table entry is defined by:
-// - `version` defaulted to zero,
-// - `owner` the owner of the rex fund,
-// - `vote_stake` the amount of CORE_SYMBOL currently included in owner's vote,
-// - `rex_balance` the amount of REX owned by owner,
-// - `matured_rex` matured REX available for selling
 struct rex_balance
 {
     uint8_t version = 0;

@@ -275,8 +275,6 @@ void currency::handle_deposit(name from, name to, asset quantity, string memo)
    check(issue_quantity.amount > fee_quantity.amount, "Invalid fee amount");
    pay_quantity.amount = issue_quantity.amount - fee_quantity.amount;
 
-   print("debug1: issue_quantity: ", issue_quantity, " , pay_quantity:", pay_quantity, " ,fee_quantity:", fee_quantity);
-
    // save debt record
    _debts.emplace(_self, [&](auto &s) {
       s.id = get_id();
