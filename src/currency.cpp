@@ -257,7 +257,7 @@ void currency::handle_deposit(name from, name to, asset quantity, string memo)
    check(quantity.amount >= cfg.minimum_deposit, "less than minimum_deposit");
 
    // get oracle from dao
-   avgprices _avgprices(cfg.price_oracle, 0);
+   avgprices _avgprices(cfg.price_oracle, cfg.market_id);
    // get avg price from oracle
    const auto &pricedata = _avgprices.get(cfg.price_period);
    auto price = pricedata.price0_avg_price;

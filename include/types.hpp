@@ -18,6 +18,7 @@ struct configs
 {
     name vote_proxy;
     name price_oracle;
+    uint64_t market_id;
     uint64_t price_period;
     uint64_t price_lower_bound;
     uint64_t price_upper_bound;
