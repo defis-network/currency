@@ -217,7 +217,7 @@ void currency::dostake(const uint64_t &debtid, const asset rex)
    asset rex_received = itr->rex_balance - rex;
    _debts.modify(debt, same_payer, [&](auto &s) {
       s.rex_received = rex_received;
-      s.rex_maturity = get_rex_maturity();
+      s.rex_maturity = utils::get_rex_maturity();
    });
 }
 
@@ -246,7 +246,7 @@ void currency::handle_deposit(name from, name to, asset quantity, string memo)
 
    check(memo == "mint", "invalid memo");
    auto sym = get_core_symbol();
-   check(sym == quantity.symbol, "only assecp core token.");
+   check(sym == quantity.symbol, "only accept core token.");
 
    globals glb = _globals.get();
 
@@ -299,7 +299,7 @@ void currency::handle_redeem(name from, name to, asset quantity, string memo)
 {
    string act;
    uint64_t id;
-   parse_memo(memo, &act, &id);
+   utils::parse_memo(memo, &act, &id);
    check(act == "redeem", "Invalid memo.");
 
    auto debt = _debts.require_find(id, "Debt does not exist.");
@@ -335,36 +335,10 @@ void currency::handle_redeem(name from, name to, asset quantity, string memo)
        .send();
 
    // return pledge to owner
-   action(
-       permission_level{get_self(), "active"_n},
-       name("eosio.token"),
-       name("transfer"),
-       make_tuple(get_self(), debt->owner, debt->pledge, string("return pledge")))
-       .send();
+   utils::inline_transfer(name("eosio.token"), get_self(), debt->owner, debt->pledge, string("return pledge"));
 
    // remove debt record
    _debts.erase(debt);
-}
-
-/**
- * @brief Calculates maturity time of purchased REX tokens which is 4 days from end
- * of the day UTC
- *
- * @return time_point_sec
- */
-time_point_sec currency::get_rex_maturity()
-{
-   const uint32_t seconds_per_day = 24 * 3600;
-   const uint32_t num_of_maturity_buckets = 5;
-   static const uint32_t now = current_time_point().sec_since_epoch();
-   static const uint32_t r = now % seconds_per_day;
-   static const time_point_sec rms{now - r + num_of_maturity_buckets * seconds_per_day};
-   return rms;
-   // for test
-   // static const uint32_t now = current_time_point().sec_since_epoch();
-   // const uint32_t seconds_per_day = 60 * 5;
-   // static const time_point_sec rms{now + seconds_per_day};
-   // return rms;
 }
 
 uint64_t currency::get_id()
@@ -373,39 +347,6 @@ uint64_t currency::get_id()
    glb.debtid += 1;
    _globals.set(glb, _self);
    return glb.debtid;
-}
-
-void currency::parse_memo(string memo, string *action, uint64_t *id)
-{
-   size_t sep_count = count(memo.begin(), memo.end(), ':');
-
-   if (sep_count == 0)
-   {
-      memo.erase(remove_if(memo.begin(), memo.end(), [](unsigned char x) { return isspace(x); }), memo.end());
-      *action = memo;
-   }
-   else if (sep_count == 1)
-   {
-      size_t pos;
-      string container;
-      pos = sub2sep(memo, &container, ':', 0, true);
-
-      *action = container;
-      *id = atoi(memo.substr(++pos).c_str());
-   }
-}
-
-size_t currency::sub2sep(string &input, string *output, const char &separator, const size_t &first_pos, const bool &required)
-{
-   check(first_pos != string::npos, "invalid first pos");
-   auto pos = input.find(separator, first_pos);
-   if (pos == string::npos)
-   {
-      check(!required, "parse memo error");
-      return string::npos;
-   }
-   *output = input.substr(first_pos, pos - first_pos);
-   return pos;
 }
 
 extern "C"
