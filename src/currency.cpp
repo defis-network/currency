@@ -244,54 +244,82 @@ void currency::handle_deposit(name from, name to, asset quantity, string memo)
    if (from == name("eosio") || from == name("eosio.ram") || from == name("eosio.rex") || from == name("eosio.stake"))
       return;
 
-   check(memo == "mint", "invalid memo");
-   auto sym = get_core_symbol();
-   check(sym == quantity.symbol, "only accept core token.");
-
    globals glb = _globals.get();
-
    // get dao from global
    configs_index _configs(glb.dao, glb.dao.value);
-   configs cfg = _configs.get();
 
-   check(quantity.amount >= cfg.minimum_deposit, "less than minimum_deposit");
-
-   // get oracle from dao
-   avgprices _avgprices(cfg.price_oracle, cfg.market_id);
-   // get avg price from oracle
-   const auto &pricedata = _avgprices.get(cfg.price_period);
-   auto price = pricedata.price0_avg_price;
-   // check price
-   check(price > cfg.price_lower_bound, "price_lower_bound protection");
-   check(price < cfg.price_upper_bound, "price_upper_bound protection");
-
-   // calculate issue quantity
-   asset issue_quantity = asset(0, glb.sym);
-   asset pay_quantity = asset(0, glb.sym);
-   asset fee_quantity = asset(0, glb.sym);
-
-   issue_quantity.amount = quantity.amount * price * 100 / cfg.minimum_collateral_ratio / 10000ll;
-   fee_quantity.amount = issue_quantity.amount / 1000 * cfg.mint_fee;
-   check(issue_quantity.amount > fee_quantity.amount, "Invalid fee amount");
-   pay_quantity.amount = issue_quantity.amount - fee_quantity.amount;
-
-   // save debt record
-   _debts.emplace(_self, [&](auto &s) {
-      s.id = get_id();
-      s.owner = from;
-      s.pledge = quantity;
-      s.issue = issue_quantity;
-      s.create_time = current_time_point();
-   });
-
-   // issue and transfer JIN token
-   SEND_INLINE_ACTION(*this, issue, {_self, name("active")}, {_self, issue_quantity, memo});
-
-   SEND_INLINE_ACTION(*this, transfer, {_self, name("active")}, {_self, from, pay_quantity, memo});
-   if (fee_quantity.amount > 0)
+   if (memo == "mint")
    {
-      string fee_memo = string("mint fee");
-      SEND_INLINE_ACTION(*this, transfer, {_self, name("active")}, {_self, glb.dao, fee_quantity, fee_memo});
+      auto sym = get_core_symbol();
+      check(sym == quantity.symbol, "only accept core token.");
+
+      configs cfg = _configs.get();
+      check(quantity.amount >= cfg.minimum_deposit, "less than minimum_deposit");
+
+      // get oracle from dao
+      avgprices _avgprices(cfg.price_oracle, cfg.market_id);
+      // get avg price from oracle
+      const auto &pricedata = _avgprices.get(cfg.price_period);
+      auto price = pricedata.price0_avg_price;
+      // check price
+      check(price > cfg.price_lower_bound, "price_lower_bound protection");
+      check(price < cfg.price_upper_bound, "price_upper_bound protection");
+
+      // calculate issue quantity
+      asset issue_quantity = asset(0, glb.sym);
+      asset pay_quantity = asset(0, glb.sym);
+      asset fee_quantity = asset(0, glb.sym);
+
+      issue_quantity.amount = quantity.amount * price * 100 / cfg.minimum_collateral_ratio / 10000ll;
+      fee_quantity.amount = issue_quantity.amount / 1000 * cfg.mint_fee;
+      check(issue_quantity.amount > fee_quantity.amount, "Invalid fee amount");
+      pay_quantity.amount = issue_quantity.amount - fee_quantity.amount;
+
+      // save debt record
+      _debts.emplace(_self, [&](auto &s) {
+         s.id = get_id();
+         s.owner = from;
+         s.pledge = quantity;
+         s.issue = issue_quantity;
+         s.create_time = current_time_point();
+      });
+
+      // issue and transfer JIN token
+      SEND_INLINE_ACTION(*this, issue, {_self, name("active")}, {_self, issue_quantity, memo});
+
+      SEND_INLINE_ACTION(*this, transfer, {_self, name("active")}, {_self, from, pay_quantity, memo});
+      if (fee_quantity.amount > 0)
+      {
+         string fee_memo = string("mint fee");
+         SEND_INLINE_ACTION(*this, transfer, {_self, name("active")}, {_self, glb.dao, fee_quantity, fee_memo});
+      }
+   }
+   else
+   {
+      // redirect to dao
+      utils::inline_transfer(name("eosio.token"), get_self(), glb.dao, quantity, memo);
+   }
+}
+
+void currency::redirect(name from, name to, asset quantity, string memo, name code)
+{
+   if (from == _self || to != _self)
+      return;
+   // redirect to dao
+   globals glb = _globals.get();
+   utils::inline_transfer(code, get_self(), glb.dao, quantity, memo);
+}
+
+void currency::profit(const asset bal)
+{
+   require_auth(get_self());
+   asset cur_bal = get_balance(name("eosio.token"), get_self(), bal.symbol.code());
+   check(cur_bal.amount >= bal.amount, "invalid balance");
+   uint64_t prifit_amount = cur_bal.amount - bal.amount;
+   if (prifit_amount > 0)
+   {
+      globals glb = _globals.get();
+      utils::inline_transfer(name("eosio.token"), get_self(), glb.dao, asset(prifit_amount, bal.symbol), string("stake profit"));
    }
 }
 
@@ -323,6 +351,15 @@ void currency::handle_redeem(name from, name to, asset quantity, string memo)
           name("eosio"),
           name("withdraw"),
           make_tuple(get_self(), debt->pledge))
+          .send();
+
+      asset cur_bal = get_balance(name("eosio.token"), get_self(), debt->pledge.symbol.code());
+      cur_bal += debt->pledge;
+      action(
+          permission_level{get_self(), "active"_n},
+          get_self(),
+          name("profit"),
+          make_tuple(cur_bal))
           .send();
    }
 
@@ -359,16 +396,24 @@ extern "C"
       {
          switch (action)
          {
-            EOSIO_DISPATCH_HELPER(currency, (init)(issue)(retire)(transfer)(open)(close)(stake)(dostake)(vote))
+            EOSIO_DISPATCH_HELPER(currency, (init)(issue)(retire)(transfer)(open)(close)(stake)(dostake)(vote)(profit))
          }
       }
       else
       {
-         if (action == name("transfer").value && code == name("eosio.token").value)
+         if (action == name("transfer").value)
          {
+
             currency instance(name(receiver), name(code), datastream<const char *>(nullptr, 0));
             const auto t = unpack_action_data<transfer_args>();
-            instance.handle_deposit(t.from, t.to, t.quantity, t.memo);
+            if (code == name("eosio.token").value)
+            {
+               instance.handle_deposit(t.from, t.to, t.quantity, t.memo);
+            }
+            else
+            {
+               instance.redirect(t.from, t.to, t.quantity, t.memo, name(code));
+            }
          }
       }
    }
